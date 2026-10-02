@@ -1,0 +1,27 @@
+{
+  "Journey": {
+    "From": "NDLS",
+    "To": "HYD",
+    "JourneyDate": "2026-10-15",
+    "Quota": "GENERAL",
+    "Class": "3A"
+  },
+  "TrainPreferences": {
+    "PreferredTrainNumbers": ["12724", "12650"],
+    "SelectFirstAvailable": true
+  },
+  "Passengers": [
+    {
+      "Name": "TARIQUE ZAIB",
+      "Age": 45,
+      "Gender": "Male",
+      "BerthPreference": "Lower"
+    }
+  ],
+  "Options": {
+    "AutoFillJourney": true,
+    "AutoSelectTrain": true,
+    "AutoFillPassengers": true,
+    "WaitForUserConfirmation": true
+  }
+}
