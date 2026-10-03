@@ -8,9 +8,7 @@ namespace IRCTCAutomator.App;
 public partial class MainWindow : Window
 {
     private readonly BookingConfigurationLoader _loader = new();
-
     private readonly PlaywrightIrctcBrowserWorkflow _browser = new();
-
     private readonly string _configPath =
         Path.Combine(
             AppContext.BaseDirectory,
@@ -20,56 +18,30 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-
-        Loaded += async (_, _) =>
-            await LoadSummaryAsync();
+        Loaded += async (_, _) => await LoadSummaryAsync();
     }
-
-    // ============================================================
-    // LOAD CONFIGURATION SUMMARY
-    // ============================================================
 
     private async Task LoadSummaryAsync()
     {
         try
         {
-            var configuration =
-                await _loader.LoadAsync(
-                    _configPath);
+            var c =
+                await _loader.LoadAsync(_configPath);
 
             ConfigSummary.Text =
-                $"Journey: " +
-                $"{configuration.Journey.From} → " +
-                $"{configuration.Journey.To}\n" +
-
-                $"Date: " +
-                $"{configuration.Journey.JourneyDate:dd/MM/yyyy}\n" +
-
-                $"Class: " +
-                $"{configuration.Journey.Class} | " +
-
-                $"Quota: " +
-                $"{configuration.Journey.Quota}\n" +
-
+                $"Journey: {c.Journey.From} → {c.Journey.To}\n" +
+                $"Date: {c.Journey.JourneyDate}\n" +
+                $"Class: {c.Journey.Class} | Quota: {c.Journey.Quota}\n" +
                 $"Preferred trains: " +
-                $"{string.Join(
-                    ", ",
-                    configuration.TrainPreferences
-                        .PreferredTrainNumbers)}\n" +
-
-                $"Passengers: " +
-                $"{configuration.Passengers.Count}";
+                $"{string.Join(", ", c.TrainPreferences.PreferredTrainNumbers)}\n" +
+                $"Passengers: {c.Passengers.Count}";
         }
         catch (Exception ex)
         {
             ConfigSummary.Text =
-                $"Configuration error:\n{ex.Message}";
+                $"Configuration error: {ex.Message}";
         }
     }
-
-    // ============================================================
-    // START
-    // ============================================================
 
     private async void StartButton_Click(
         object sender,
@@ -79,90 +51,58 @@ public partial class MainWindow : Window
 
         try
         {
-            ConfigSummary.Text =
-                "Starting IRCTC...\n\n" +
-                "Preparing journey configuration...";
+            var c =
+                await _loader.LoadAsync(_configPath);
 
-            var configuration =
-                await _loader.LoadAsync(
-                    _configPath);
-
-            // ----------------------------------------------------
-            // Open IRCTC
-            // ----------------------------------------------------
-
-            ConfigSummary.Text =
-                "Opening IRCTC...";
+            // ====================================================
+            // 1. OPEN IRCTC
+            // ====================================================
 
             await _browser.OpenTrainSearchAsync();
 
-            // ----------------------------------------------------
-            // Prepare journey + search + locate train
-            // ----------------------------------------------------
+            // ====================================================
+            // 2. LOGIN FIRST
+            // ====================================================
 
-            ConfigSummary.Text =
-                "Preparing journey...\n\n" +
-                $"From: {configuration.Journey.From}\n" +
-                $"To: {configuration.Journey.To}\n" +
-                $"Date: {configuration.Journey.JourneyDate:dd/MM/yyyy}\n" +
-                $"Class: {configuration.Journey.Class}";
+            await _browser.LoginFirstAsync();
 
-            await _browser.PrepareJourneyAsync(
-                configuration);
+            // ====================================================
+            // 3. ONLY AFTER LOGIN, PREPARE JOURNEY
+            // ====================================================
 
-            // ----------------------------------------------------
-            // Availability result
-            // ----------------------------------------------------
+            await _browser.PrepareJourneyAsync(c);
+
+            // ====================================================
+            // 4. PASSENGERS
+            // ====================================================
+
+            await _browser.PreparePassengersAsync(c);
 
             var result =
                 _browser.LastAvailabilityResult;
 
             if (result is not null)
             {
-                ConfigSummary.Text =
-                    "TRAIN FOUND\n\n" +
-
-                    $"Train: " +
-                    $"{result.TrainNumber}\n\n" +
-
-                    $"Class: " +
-                    $"{result.ClassName}\n\n" +
-
-                    $"Journey Date: " +
-                    $"{result.JourneyDate:dd/MM/yyyy}\n\n" +
-
-                    $"Availability: " +
-                    $"{result.Availability}\n\n" +
-
-                    $"Fare: " +
-                    $"{result.Fare}\n\n" +
-
-                    "Ready for the next user-controlled step.";
+                //MessageBox.Show(
+                //    $"Train: {result.TrainNumber}\n" +
+                //    $"Class: {result.ClassName}\n" +
+                //    $"Availability: {result.Availability}\n" +
+                //    $"Fare: {result.Fare}",
+                //    "IRCTC Availability",
+                //    MessageBoxButton.OK,
+                //    MessageBoxImage.Information);
             }
             else
             {
-                ConfigSummary.Text =
-                    "Train was found, but availability " +
-                    "could not be read.";
+                MessageBox.Show(
+                    "IRCTC preparation completed.",
+                    "IRCTC Automator",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
             }
-
-            MessageBox.Show(
-                result is null
-                    ? "Train found, but availability could not be read."
-                    : $"Train: {result.TrainNumber}\n" +
-                      $"Class: {result.ClassName}\n" +
-                      $"Availability: {result.Availability}\n" +
-                      $"Fare: {result.Fare}",
-                "IRCTC Availability",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
         }
         catch (Exception ex)
         {
-            ConfigSummary.Text =
-                "ERROR\n\n" +
-                ex.Message;
-
             MessageBox.Show(
                 ex.ToString(),
                 "IRCTC Automator Error",
@@ -175,16 +115,11 @@ public partial class MainWindow : Window
         }
     }
 
-    // ============================================================
-    // CLOSE
-    // ============================================================
-
     private async void Close_Click(
         object sender,
         RoutedEventArgs e)
     {
         await _browser.CloseAsync();
-
         Close();
     }
 }
